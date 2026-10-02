@@ -115,7 +115,7 @@ function bar(){
 }
 document.getElementById("notifBtn").onclick=function(){try{Notification.requestPermission().then(bar)}catch(e){bar()}};
 document.getElementById("date").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
-var LN=(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())?(function(){function c(m){return function(o){return Capacitor.nativePromise("LocalNotifications",m,o||{})}}return{requestPermissions:c("requestPermissions"),getPending:c("getPending"),cancel:c("cancel"),schedule:c("schedule")}})():null;;
+var LN=(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())?Capacitor.Plugins.LocalNotifications:null;
 function hash(x){var h=0;for(var i=0;i<x.length;i++)h=(h*31+x.charCodeAt(i))|0;return Math.abs(h)%2000000000+1}
 async function nativeSync(){
  if(!LN)return;
