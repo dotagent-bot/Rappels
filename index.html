@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mes rappels du jour</title>
+<style>
+:root{--bg:#eef3f1;--card:#fff;--ink:#17261f;--mute:#60726a;--line:#d3dedb;--acc:#2a4bd7;--acc-ink:#fff;--ok:#2f8f5b;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101a16;--card:#18251f;--ink:#e8f0ec;--mute:#93a79d;--line:#2a3c34;--acc:#7f95ff;--acc-ink:#101a16;--ok:#58c487}}
+:root[data-theme="dark"]{--bg:#101a16;--card:#18251f;--ink:#e8f0ec;--mute:#93a79d;--line:#2a3c34;--acc:#7f95ff;--acc-ink:#101a16;--ok:#58c487}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 Georgia,"Iowan Old Style",serif}
+main{max-width:560px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:34px;line-height:1.1;margin:8px 0 2px;font-weight:700;letter-spacing:-.5px}
+.date{color:var(--mute);margin:0 0 18px;text-transform:capitalize}
+button,input{font:inherit;color:inherit}
+.bar{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:16px;font-size:15px}
+.bar button{background:var(--acc);color:var(--acc-ink);border:0;border-radius:8px;padding:8px 12px;font-weight:600}
+form{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:22px;display:grid;gap:10px}
+form input[type=text]{width:100%;border:1px solid var(--line);background:transparent;border-radius:8px;padding:12px;font-size:17px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.row label{display:flex;gap:6px;align-items:center;font-size:15px;color:var(--mute)}
+input[type=time]{border:1px solid var(--line);background:transparent;border-radius:8px;padding:8px}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--acc)}
+.add{background:var(--acc);color:var(--acc-ink);border:0;border-radius:10px;padding:12px;font-weight:700;font-size:17px}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+li{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--acc);border-radius:10px;padding:12px}
+li.done{border-left-color:var(--ok);opacity:.65}
+li.done .t{text-decoration:line-through}
+.t{flex:1;min-width:0;overflow-wrap:anywhere}
+.m{display:block;font-size:14px;color:var(--mute)}
+li button{background:none;border:0;color:var(--mute);padding:6px;font-size:14px;text-decoration:underline}
+.empty{color:var(--mute);text-align:center;padding:24px 8px}
+#toast{position:fixed;left:12px;right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);border-radius:12px;padding:14px;display:none;z-index:9}
+.note{color:var(--mute);font-size:14px;margin-top:20px}
+</style>
+</head>
+<body>
+<main>
+<h1>Aujourd'hui</h1>
+<p class="date" id="date"></p>
+
+<div class="bar" id="bar"><span id="barText"></span><button id="notifBtn" type="button">Activer</button></div>
+
+<form id="f">
+<input type="text" id="title" placeholder="Que faut-il faire ?" required maxlength="120" autocomplete="off">
+<div class="row">
+<label>Heure <input type="time" id="time"></label>
+<label><input type="checkbox" id="daily"> Chaque jour</label>
+</div>
+<button class="add" id="addBtn" type="submit">Ajouter la tâche</button>
+</form>
+
+<ul id="list"></ul>
+<p class="note">Les rappels sonnent même quand l'appli est fermée.</p>
+</main>
+<div id="toast" role="alert"></div>
+
+<script>
+(function(){
+var KEY="rappels-v1",tasks=[],editId=null;
+function pad(n){return n<10?"0"+n:""+n}
+function today(){var d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function load(){try{tasks=JSON.parse(localStorage.getItem(KEY))||[]}catch(e){tasks=[]}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(tasks))}catch(e){}nativeSync()}
+function cleanup(){var t=today();tasks=tasks.filter(function(k){return k.daily||k.date===t})}
+function visible(){var t=today();return tasks.filter(function(k){return k.daily||k.date===t}).sort(function(a,b){
+ if(!a.time&&!b.time)return a.created-b.created;if(!a.time)return 1;if(!b.time)return -1;return a.time<b.time?-1:1})}
+function isDone(k){return k.doneDate===today()}
+function render(){
+ var ul=document.getElementById("list"),v=visible();ul.innerHTML="";
+ if(!v.length){ul.innerHTML='<li class="empty" style="display:block;border-left-width:1px">Rien de prévu. Ajoutez votre première tâche ci-dessus.</li>';return}
+ v.forEach(function(k){
+  var li=document.createElement("li");if(isDone(k))li.className="done";
+  var cb=document.createElement("input");cb.type="checkbox";cb.checked=isDone(k);cb.setAttribute("aria-label","Terminée");
+  cb.onchange=function(){k.doneDate=cb.checked?today():null;save();render()};
+  var s=document.createElement("span");s.className="t";s.textContent=k.title;
+  var m=document.createElement("span");m.className="m";
+  m.textContent=[k.time?"à "+k.time:"",k.daily?"chaque jour":""].filter(Boolean).join(", ");
+  if(m.textContent)s.appendChild(m);
+  var e=document.createElement("button");e.type="button";e.textContent="Modifier";e.onclick=function(){edit(k)};
+  var d=document.createElement("button");d.type="button";d.textContent="Supprimer";d.onclick=function(){tasks=tasks.filter(function(x){return x.id!==k.id});save();render()};
+  li.appendChild(cb);li.appendChild(s);li.appendChild(e);li.appendChild(d);ul.appendChild(li);
+ });
+}
+function edit(k){editId=k.id;title.value=k.title;time.value=k.time||"";daily.checked=k.daily;addBtn.textContent="Enregistrer les changements";title.focus()}
+var f=document.getElementById("f"),title=document.getElementById("title"),time=document.getElementById("time"),daily=document.getElementById("daily"),addBtn=document.getElementById("addBtn");
+f.onsubmit=function(ev){ev.preventDefault();var t=title.value.trim();if(!t)return;
+ if(editId){tasks.forEach(function(k){if(k.id===editId){k.title=t;k.time=time.value;k.daily=daily.checked;k.notified=null}});editId=null;addBtn.textContent="Ajouter la tâche"}
+ else tasks.push({id:Date.now()+""+Math.random(),title:t,time:time.value,daily:daily.checked,date:today(),created:Date.now(),doneDate:null,notified:null});
+ f.reset();save();render()};
+function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.style.display="block";clearTimeout(toast.h);toast.h=setTimeout(function(){t.style.display="none"},8000)}
+function notify(k){
+ var msg="Rappel : "+k.title;toast(msg);
+ try{if(navigator.vibrate)navigator.vibrate([200,100,200])}catch(e){}
+ try{if("Notification" in window&&Notification.permission==="granted")new Notification("Rappel",{body:k.title})}catch(e){}
+}
+function tick(){
+ var d=new Date(),now=pad(d.getHours())+":"+pad(d.getMinutes()),t=today(),ch=false;
+ visible().forEach(function(k){
+  if(k.time&&k.time<=now&&k.notified!==t&&!isDone(k)){k.notified=t;ch=true;notify(k)}
+ });
+ if(ch)save();
+}
+function bar(){
+ var txt=document.getElementById("barText"),b=document.getElementById("notifBtn");
+ if(!("Notification" in window)){txt.textContent="Notifications non disponibles : un message s'affichera dans la page.";b.style.display="none";return}
+ var p=Notification.permission;
+ if(p==="granted"){txt.textContent="Notifications activées.";b.style.display="none"}
+ else if(p==="denied"){txt.textContent="Notifications bloquées. Autorisez-les dans les réglages du site.";b.style.display="none"}
+ else{txt.textContent="Activez les notifications pour être rappelé.";b.style.display=""}
+}
+document.getElementById("notifBtn").onclick=function(){try{Notification.requestPermission().then(bar)}catch(e){bar()}};
+document.getElementById("date").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+var LN=(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())?Capacitor.Plugins.LocalNotifications:null;
+function hash(x){var h=0;for(var i=0;i<x.length;i++)h=(h*31+x.charCodeAt(i))|0;return Math.abs(h)%2000000000+1}
+async function nativeSync(){
+ if(!LN)return;
+ try{
+  var p=await LN.getPending();if(p.notifications.length)await LN.cancel({notifications:p.notifications});
+  var items=[],now=new Date();
+  tasks.forEach(function(k){if(!k.time)return;
+   var hm=k.time.split(":"),h=+hm[0],m=+hm[1];
+   if(k.daily)items.push({id:hash(k.id),title:"Rappel",body:k.title,schedule:{on:{hour:h,minute:m},allowWhileIdle:true}});
+   else if(k.date===today()&&!isDone(k)){var at=new Date();at.setHours(h,m,0,0);if(at>now)items.push({id:hash(k.id),title:"Rappel",body:k.title,schedule:{at:at,allowWhileIdle:true}})}
+  });
+  if(items.length)await LN.schedule({notifications:items});
+ }catch(e){}
+}
+if(LN){LN.requestPermissions().then(nativeSync);document.getElementById("bar").style.display="none"}
+load();cleanup();save();render();bar();tick();setInterval(tick,15000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden){cleanup();render();tick()}});
+})();
+</script>
+</body>
+</html>
